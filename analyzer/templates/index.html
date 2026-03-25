@@ -1,0 +1,235 @@
+<!-- prettier-ignore-start -->
+<!doctype html>
+
+<html>
+  <head>
+    <title>AI Code Reviewer</title>
+
+    <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+
+    <style>
+      body {
+        margin:0;
+        font-family: 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: white;
+        text-align: center;
+      }
+
+      h1 {
+        margin-top: 20px;
+        font-size: 2.5rem;
+        animation: fadeInDown 1s ease;
+      }
+
+      select {
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        border: none;
+      }
+
+      #editor {
+        width: 85%;
+        height: 420px;
+        margin: 20px auto;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        text-align: left;
+
+      }
+
+      button {
+        margin-top: 20px;
+        padding: 12px 30px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(45deg, #3b82f6, #6366f1);
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        
+      }
+      button:hover {
+         transform: scale(1.05);
+         box-shadow: 0 5px 15px rgba(99,102,241,0.6);
+      }
+
+      .result {
+        margin: 40px auto;
+        width: 60%;
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(10px);
+        padding: 25px;
+        border-radius: 12px;
+        animation: fadeInUp 0.8s ease;
+      }
+
+      /* Loading */
+      #loading {
+        font-size: 18px;
+        animation: pulse 1s infinite;
+      }
+
+      /* Animations */
+      @keyframes fadeInDown {
+       from {opacity: 0; transform: translateY(-20px);}
+       to {opacity: 1; transform: translateY(0);}
+      }
+
+      @keyframes fadeInUp {
+       from {opacity: 0; transform: translateY(20px);}
+       to {opacity: 1; transform: translateY(0);}
+      }
+
+      @keyframes pulse {
+       0% {opacity: 0.4;}
+       50% {opacity: 1;}
+       100% {opacity: 0.4;}
+      }
+
+      body.light {
+         background: #f1f5f9;
+         color: #0f172a;
+      }
+      body.light .result {
+         background: rgba(0,0,0,0.05);
+      }
+
+      body.light button {
+        background: linear-gradient(45deg, #2563eb, #4f46e5);
+      }
+
+    </style>
+  </head>
+
+  <body>
+    <h1>🚀 AI Code Reviewer</h1>
+    <p style="opacity:0.7;">Analyze your code like a pro</p>
+
+    <form method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="language" id="langInput" />
+      <div style = "margin-top: 10px;">
+
+         <select id="language">
+
+           <option value="python" {% if language == "python" %}selected{% endif %}>Python</option>
+          <option value="javascript" {% if language == "javascript" %}   selected{% endif %}>JavaScript</option>
+           <option value="java" {% if language == "java" %}selected{% endif %}>Java</option>
+
+         </select>
+      </div>
+       <button onclick="toggleTheme()" style="position:absolute; top:20px; right:20px;">
+    🌙 / ☀️
+       </button>
+      <div id="editor"></div>
+
+      <textarea name="code" id="code" hidden></textarea>
+
+      <button type="button" onclick="submitCode()">Analyze Code</button>
+
+      <div id="loading" style="display: none; margin-top: 20px">
+        <p>🔍 Analyzing your code...</p>
+      </div>
+    </form>
+
+    {% if result %}
+    <div class="result">
+
+      <h3>🧠 AI Explanation</h3>
+      <p>{{ result.explanation }}</p>
+
+      <h2>Score: {{ result.score }}/10</h2>
+
+      <h3>Issues:</h3>
+      <ul>
+        {% for issue in result.issues %}
+           <li>{{ issue }}</li>
+        {% endfor %}
+      </ul>
+
+      <h3>Suggestions:</h3>
+      <ul>
+        {% for s in result.suggestions %}
+           <li>{{ s }}</li>
+        {% endfor %}
+      </ul>
+
+    </div>
+    {% endif %}
+
+    <script>
+      const savedCode = `{{ code|escapejs }}`;
+      let editor;
+
+      require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' }});
+
+      require(["vs/editor/editor.main"], function () {
+
+        editor = monaco.editor.create(document.getElementById("editor"), {
+        value: "",
+        language: "{{ language|default:'python' }}",
+        theme: "vs-dark",
+        automaticLayout: true,
+        minimap: { enabled: false },
+    });
+
+    // 👇 FORCE RESTORE CODE AFTER EVERYTHING LOADS
+    if (savedCode && savedCode.trim() !== "") {
+        editor.setValue(savedCode);
+    } else {
+        editor.setValue("// Write your code here");
+    }
+
+    // language switch
+    document.getElementById("language").addEventListener("change", function () {
+        monaco.editor.setModelLanguage(editor.getModel(), this.value);
+    });
+
+});
+
+      function submitCode() {
+
+       const codeValue = editor.getValue();
+
+       document.getElementById("code").value = codeValue;
+       document.getElementById("langInput").value = document.getElementById("language").value;
+
+       document.getElementById("loading").style.display = "block";
+
+      setTimeout(() => {
+        document.querySelector("form").submit();
+      }, 800);
+  }
+
+       function toggleTheme() {
+          document.body.classList.toggle("light");
+
+          if (document.body.classList.contains("light")) {
+            localStorage.setItem("theme", "light");
+          } else {
+        localStorage.setItem("theme", "dark");
+          }
+       }
+       window.onload = function () {
+          const savedTheme = localStorage.getItem("theme");
+
+          if (savedTheme === "light") {
+              document.body.classList.add("light");
+          }
+        };
+
+
+
+
+      
+
+
+
+    </script>
+  </body>
+</html>
+<!-- prettier-ignore-end -->
